@@ -64,14 +64,14 @@ record Casing (A : Set) : Set₁ where
   field
     Types : List (Set -> Set)
     cases : A -> Env (map (λ t -> t X) Types ++ XS) -> Env (X ∷ XS)
-open Casing {{...}}
+open Casing {{...}} using (cases)
 
 record Inductive (A : Set) : Set₁ where
   constructor induct
   field
     Types : List ((A -> Set) -> Set)
     induction : (a : A) -> Env (map (λ t -> t P) Types ++ XS) -> Env (P a ∷ XS)
-open Inductive {{...}}
+open Inductive {{...}} using (induction)
 
 instance
   _ : Casing Bool
@@ -117,17 +117,33 @@ instance
         helper zero z f = z
         helper (suc n) z f = f n (helper n z f)
 
+record App (A : Set) : Set₁ where
+  constructor app
+  field
+    Froms : List Set
+    To : Set
+    apply : A -> Env (Froms ++ XS) -> Env (To ∷ XS)
+open App {{...}} using (apply)
+
+instance
+  AppZ : App A
+  AppZ {A = A} = record
+    { Froms = []
+    ; To    = A
+    ; apply = λ a xs -> a ◂ xs
+    }
+  AppS : {{App B}} -> App (A -> B)
+  AppS {A = A} {{app F T ap}} = record
+    { Froms = A ∷ F
+    ; To    = T
+    ; apply = λ {f (a ◂ fxs) -> ap (f a) fxs}
+    }
+
 exact : X -> Env XS -> Env (X ∷ XS)
-exact = _◂_
+exact = apply
 
 reflexivity : Env XS -> Env ((a ≡ a) ∷ XS)
 reflexivity = exact refl
-
-apply : (A -> B) -> Env (A ∷ XS) -> Env (B ∷ XS)
-apply f (a ◂ xs) = f a ◂ xs
-
-apply2 : (A -> B -> C) -> Env (A ∷ B ∷ XS) -> Env (C ∷ XS)
-apply2 f (a ◂ b ◂ xs) = f a b ◂ xs
 
 rw : ∀ {u} {A : Set u} {P : A -> Set} {a b : A} -> a ≡ b -> Env (P b ∷ XS) -> Env (P a ∷ XS)
 rw refl xs = xs
@@ -190,7 +206,7 @@ module Examples where
 
   trans~ : f ~ g -> g ~ h -> f ~ h
   trans~ H1 H2 x = by
-    apply2 trans ,
+    apply trans ,
     exact (H1 x) ,
     exact (H2 x) ∎
 
